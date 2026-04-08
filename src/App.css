@@ -1,0 +1,83 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Manrope', sans-serif; background: var(--surface, #fcf9f5); }
+.app { width: 100%; min-height: 100vh; position: relative; }
+
+/* Full-width layout for planning/result phases */
+.main-layout {
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Voice agent overlay backdrop */
+.voice-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 28, 26, 0.1);
+  backdrop-filter: blur(2px);
+  z-index: 40;
+  opacity: 0;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* Floating concierge button */
+.concierge-fab {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 30;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7d5630, #c4956a);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 32px rgba(125, 86, 48, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+  outline: 8px solid rgba(125, 86, 48, 0.1);
+}
+.concierge-fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 12px 40px rgba(125, 86, 48, 0.4);
+}
+.concierge-fab:active { transform: scale(0.95); }
+.concierge-fab .material-symbols-outlined {
+  font-size: 28px;
+  font-variation-settings: 'FILL' 1;
+}
+
+/* Concierge tooltip */
+.concierge-tooltip {
+  position: fixed;
+  bottom: 6.5rem;
+  right: 2rem;
+  z-index: 30;
+  background: rgba(252, 249, 245, 0.85);
+  backdrop-filter: blur(20px);
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(28, 28, 26, 0.08);
+  max-width: 280px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--on-surface, #1c1c1a);
+  animation: fadeSlideUp 0.3s ease;
+}
+
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .concierge-fab { bottom: 1.5rem; right: 1.5rem; width: 56px; height: 56px; }
+  .concierge-tooltip { right: 1.5rem; bottom: 5.5rem; max-width: 240px; }
+}

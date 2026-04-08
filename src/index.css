@@ -1,0 +1,87 @@
+:root {
+  /* Stitch Luxury Design Tokens */
+  --surface: #fcf9f5;
+  --surface-dim: #dcdad6;
+  --surface-bright: #fcf9f5;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f6f3ef;
+  --surface-container: #f0ede9;
+  --surface-container-high: #eae8e4;
+  --surface-container-highest: #e5e2de;
+  --surface-variant: #e5e2de;
+  --surface-tint: #7d5630;
+
+  --primary: #7d5630;
+  --primary-container: #c4956a;
+  --primary-fixed: #ffdcbf;
+  --primary-fixed-dim: #f0bd8f;
+
+  --secondary: #5f5e5e;
+  --secondary-container: #e4e2e1;
+
+  --tertiary: #3c6377;
+  --tertiary-container: #7da4ba;
+
+  --on-surface: #1c1c1a;
+  --on-surface-variant: #50453b;
+  --on-primary: #ffffff;
+  --on-primary-container: #4e2e0c;
+  --on-secondary-container: #656464;
+  --on-background: #1c1c1a;
+
+  --outline: #82756a;
+  --outline-variant: #d4c3b7;
+
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+
+  --inverse-surface: #31302e;
+  --inverse-on-surface: #f3f0ec;
+  --inverse-primary: #f0bd8f;
+
+  /* Typography */
+  --font-headline: 'Noto Serif', serif;
+  --font-body: 'Manrope', sans-serif;
+  --font-label: 'Manrope', sans-serif;
+
+  font: 16px/1.6 var(--font-body);
+  color: var(--on-surface);
+  background: var(--surface);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body { margin: 0; background: var(--surface); }
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-headline);
+  color: var(--on-surface);
+  margin: 0;
+}
+
+p { margin: 0; }
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--surface-container-highest); border-radius: 10px; }
+
+::selection {
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
