@@ -1,123 +1,89 @@
 import { useState, useRef, useEffect } from "react"
 import "./VoiceAgent.css"
 
-const SYSTEM_PROMPT = `You are Wander, a warm and knowledgeable AI travel planning assistant. You have deep expertise in global travel, local culture, food, and transportation systems.
-
-Your job is to quickly gather the traveler's preferences, then build a personalized itinerary.
-
-CRITICAL RULES:
-- Keep your "message" field to 2-3 sentences MAX. Be concise and conversational.
-- NEVER write long paragraphs, bullet-point lists, or detailed breakdowns in the message field.
-- Do NOT include emoji or special Unicode symbols in the itinerary JSON field values. Keep all values as plain text only.
-- Be efficient. Do NOT drag out the conversation. Aim for 2-3 exchanges before generating the itinerary.
-
-CONVERSATION FLOW:
-Turn 1 (your first response after the user says where they want to go):
-Ask the essential details ALL AT ONCE in a short, friendly way. Example:
-"Amazing choice! To build your perfect trip, tell me:
-- Travel dates and how many days?
-- Who's going? (solo, couple, family, friends)
-- Budget range? (budget / mid-range / luxury)
-- What are you most excited about? (food, history, nightlife, nature, shopping, etc.)
-- Anything to avoid?"
-
-Turn 2: If the user answers most of those, you have enough. Say "I have everything I need!" and generate the itinerary immediately. Only ask a brief follow-up if critical info is missing (like dates).
-
-Do NOT ask about accommodation style, transport comfort, or travel pace separately. Make reasonable defaults based on their budget and group.
-
-RESPONSE FORMAT:
-Always respond with a JSON object:
-{
-  "message": "Your conversational response here (2-3 sentences max)",
-  "question": "The next question to ask (short, friendly)",
-  "profileUpdate": { "key": "value" },
-  "itinerary": null or { ... full itinerary object when ready ... },
-  "done": false or true
-}
-
-ITINERARY FORMAT (when ready):
-{
-  "destination": "Tokyo, Japan",
-  "dates": "June 10-17, 2025",
-  "travelers": "Couple",
-  "budget": "Mid-range (~$150/day)",
-  "days": [
-    {
-      "day": 1,
-      "title": "Arrival & Shinjuku",
-      "theme": "Getting your bearings",
-      "morning": { "activity": "...", "place": "...", "place_query": "specific restaurant name for API lookup", "tip": "...", "duration": "2hrs" },
-      "afternoon": { "activity": "...", "place": "...", "place_query": "specific attraction name for API lookup", "tip": "...", "duration": "3hrs" },
-      "evening": { "activity": "...", "place": "...", "place_query": "specific venue name for API lookup", "tip": "...", "duration": "2hrs" },
-      "meals": {
-        "breakfast": { "name": "...", "type": "...", "place_query": "specific cafe name for API lookup", "cost": "$", "why": "..." },
-        "lunch": { "name": "...", "type": "...", "place_query": "specific restaurant name for API lookup", "cost": "$$", "why": "..." },
-        "dinner": { "name": "...", "type": "...", "place_query": "specific restaurant name for API lookup", "cost": "$$", "why": "..." }
-      },
-      "transport": "Take the Yamanote Line from...",
-      "budget_estimate": "$120"
-    }
-  ],
-  "transit_guide": {
-    "overview": "Tokyo has one of the world's best transit systems...",
-    "key_card": "Get a Suica card at any airport or station",
-    "apps": ["Google Maps", "Citymapper"],
-    "tips": ["...", "..."],
-    "common_mistakes": ["...", "..."]
-  },
-  "total_budget_estimate": "$850-1100",
-  "insider_tips": ["...", "..."]
-}
-
-Be warm, specific, and excited about travel. Reference their previous answers to show you're listening.`
-
 export default function VoiceAgent({
+  // Durable state, owned by App so it survives closing the panel.
+  conversation,
+  setConversation,
+  chatMessages,
+  setChatMessages,
+  done,
+  setDone,
+  voiceEnabled,
+  setVoiceEnabled,
+  greeting,
   onItineraryUpdate,
-  onConversationUpdate,
   onProfileUpdate,
   onComplete,
   onClose,
   resultMode,
-  finalItinerary,
 }) {
-  const [messages, setMessages] = useState([{ type: "agent", text: "Hi! I'm Wander, your AI travel planner. Where in the world are you dreaming of going?" }])
+  // Transient state — correctly starts fresh each time the panel opens.
   const [isListening, setIsListening] = useState(false)
   const [isThinking, setIsThinking] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [transcript, setTranscript] = useState("")
   const [inputText, setInputText] = useState("")
-  const [done, setDone] = useState(false)
   const [error, setError] = useState("")
-  const [voiceEnabled, setVoiceEnabled] = useState(true)
 
   const recognitionRef = useRef(null)
   const messagesEndRef = useRef(null)
   const audioRef = useRef(null)
-  const conversationRef = useRef([])
+  const audioUrlRef = useRef(null)
   const initializedRef = useRef(false)
   const transcriptRef = useRef("")
 
   useEffect(() => {
+    // Guards StrictMode's double-invoke. The `conversation.length` check is
+    // what stops the greeting replaying every time the panel is reopened.
     if (initializedRef.current) return
     initializedRef.current = true
 
-    if (resultMode) {
-      setDone(true)
-      setMessages(prev => [...prev, { type: "agent", text: "Your itinerary is ready! You can download it as a PDF, or keep chatting to refine anything." }])
-    } else {
-      speakMessage("Hi! I'm Wander, your AI travel planner. Where in the world are you dreaming of going?")
+    if (!resultMode && conversation.length === 0) {
+      speakMessage(greeting)
     }
   }, [])
 
+  // resultMode can flip while the panel is already open, so it gets its own
+  // effect rather than being read once on mount.
+  useEffect(() => {
+    if (resultMode && !done) {
+      setDone(true)
+      setChatMessages(prev => [...prev, { type: "agent", text: "Your itinerary is ready! You can download it as a PDF, or keep chatting to refine anything." }])
+    }
+  }, [resultMode])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [chatMessages])
+
+  // Release the audio and microphone resources this component owns when the
+  // panel closes, so nothing keeps playing or listening after unmount.
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current)
+        audioUrlRef.current = null
+      }
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel()
+      recognitionRef.current?.abort()
+      recognitionRef.current = null
+    }
+  }, [])
 
   const stopSpeaking = () => {
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.currentTime = 0
       audioRef.current = null
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current)
+      audioUrlRef.current = null
     }
     setIsSpeaking(false)
   }
@@ -137,6 +103,7 @@ export default function VoiceAgent({
         const url = URL.createObjectURL(blob)
         const audio = new Audio(url)
         audioRef.current = audio
+        audioUrlRef.current = url
         audio.onended = () => setIsSpeaking(false)
         audio.play().catch(() => setIsSpeaking(false))
       } else {
@@ -204,10 +171,10 @@ export default function VoiceAgent({
     stopSpeaking()
 
     const userMsg = { role: "user", content: text }
-    const newMessages = [...conversationRef.current, userMsg]
-    conversationRef.current = newMessages
+    const newMessages = [...conversation, userMsg]
+    setConversation(newMessages)
 
-    setMessages(prev => [...prev, { type: "user", text }])
+    setChatMessages(prev => [...prev, { type: "user", text }])
     setInputText("")
     setIsThinking(true)
     setError("")
@@ -216,10 +183,9 @@ export default function VoiceAgent({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: newMessages,
-          systemPrompt: SYSTEM_PROMPT,
-        }),
+        // The system prompt lives on the server (server/prompts.js) so it
+        // can't be swapped out by a caller.
+        body: JSON.stringify({ messages: newMessages }),
       })
 
       if (!res.ok) {
@@ -273,14 +239,13 @@ export default function VoiceAgent({
         role: "assistant",
         content: JSON.stringify(parsed),
       }
-      conversationRef.current = [...newMessages, assistantMsg]
+      setConversation([...newMessages, assistantMsg])
 
       const displayText = parsed.question
         ? `${parsed.message} ${parsed.question}`
         : parsed.message
 
-      setMessages(prev => [...prev, { type: "agent", text: displayText }])
-      onConversationUpdate(conversationRef.current)
+      setChatMessages(prev => [...prev, { type: "agent", text: displayText }])
 
       if (parsed.profileUpdate) {
         onProfileUpdate(parsed.profileUpdate)
@@ -337,7 +302,7 @@ export default function VoiceAgent({
       </div>
 
       <div className="messages-list">
-        {messages.map((msg, i) => (
+        {chatMessages.map((msg, i) => (
           <div key={i} className={`msg msg-${msg.type}`}>
             <span>{msg.text}</span>
           </div>
