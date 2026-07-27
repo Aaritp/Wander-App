@@ -38,15 +38,32 @@ if (isProduction && allowedOrigins.length === 0) {
 
 const isLocalhost = origin => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
 
-app.use(cors({
-  origin(origin, callback) {
-    // No Origin header: same-origin requests, curl, health checks.
-    if (!origin) return callback(null, true)
-    if (allowedOrigins.includes(origin)) return callback(null, true)
-    if (!isProduction && isLocalhost(origin)) return callback(null, true)
-    return callback(new Error("Not allowed by CORS"))
-  },
-}))
+// Browsers send an Origin header on same-origin requests too — on any non-GET
+// request, and on subresources marked crossorigin — so "no Origin" is not a
+// sufficient test for same-origin. Compare the origin's host to the host the
+// request came in on.
+const isSameOrigin = (origin, req) => {
+  try {
+    return new URL(origin).host === req.headers.host
+  } catch {
+    return false
+  }
+}
+
+const corsOptions = (req, callback) => {
+  const origin = req.headers.origin
+  const allowed =
+    !origin ||                                        // curl, health checks, navigations
+    isSameOrigin(origin, req) ||                      // the app's own frontend
+    allowedOrigins.includes(origin) ||
+    (!isProduction && isLocalhost(origin))
+
+  callback(allowed ? null : new Error("Not allowed by CORS"), { origin: true })
+}
+
+// Scoped to /api: the static frontend is public by nature and must not be
+// gated, or the browser cannot load its own script and stylesheet.
+app.use("/api", cors(corsOptions))
 
 app.use(express.json({ limit: "1mb" }))
 
